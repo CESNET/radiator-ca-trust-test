@@ -6,7 +6,6 @@ use strict;
 use Data::Dumper;
 
 my $maxTestTime = 30; # maximum time we will mess with any of our clients
-my $maxIgnoreTime = 0;
 my %known;
 my %leaked;
 my %ignore;
@@ -41,15 +40,7 @@ sub evaluateResult {
   };
 
   if ($result == $main::ACCEPT or $result == $main::REJECT) {
-    if ($maxIgnoreTime) {
-      # It is possible to use $main::IGNORE to not respond to
-      # client. Client will be retransmiting requests and very likely
-      # get reject anyway.
-      $ignore{$CSI} = $now unless (exists $ignore{$CSI});
-      ${$_[2]} = $main::IGNORE;
-    } else {
-      ${$_[2]} = $main::REJECT;
-    };
+    ${$_[2]} = $main::REJECT;
   };
 };
 
@@ -63,33 +54,24 @@ sub tagClient {
 
   my $now = time;
 
-  if (exists $ignore{$CSI}) {
-    if ($now <= $ignore{$CSI}+$maxIgnoreTime) {
-      $p->add_attr('CESNET-CATrustTest', 'TEST');
-      &main::log($main::LOG_DEBUG, "CATrustTest: ignoring client $CSI / $user; $now; ".($ignore{$CSI}+$maxIgnoreTime));
-      return;
-    };
-    delete $ignore{$CSI};
+  my $test = 1;
+  if (exists $known{$CSI}) {
+    # know client, test only if it is recent
+    $test = $now <= ($known{$CSI}+$maxTestTime);
   } else {
-    my $test = 1;
-    if (exists $known{$CSI}) {
-      # know client, test only if it is recent
-      $test = $now <= ($known{$CSI}+$maxTestTime);
-    } else {
-      # we meet first time
-      $known{$CSI} = $now;
-    };
+    # we meet first time
+    $known{$CSI} = $now;
+  };
 
-    if ($test and (exists $leaked{$CSI})) {
-      # client already leaked his password; do not mess his authentication anymore
-      $test = 0;
-    };
+  if ($test and (exists $leaked{$CSI})) {
+    # client already leaked his password; do not mess his authentication anymore
+    $test = 0;
+  };
 
-    if ($test) {
-      $p->add_attr('CESNET-CATrustTest', 'TEST');
-      &main::log($main::LOG_DEBUG, "CATrustTest: testing client $CSI / $user");
-      return;
-    };
+  if ($test) {
+    $p->add_attr('CESNET-CATrustTest', 'TEST');
+    &main::log($main::LOG_DEBUG, "CATrustTest: testing client $CSI / $user");
+    return;
   };
 
   &main::log($main::LOG_DEBUG, "CATrustTest: not testing client $CSI / $user");
