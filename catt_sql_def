@@ -1,0 +1,13 @@
+CREATE DATABASE radiator;
+USE radiator;
+CREATE TABLE catt (
+  timestamp int(11),
+  username varchar(64),
+  mac varchar(64),
+  result set('unknown','CArefused','CAaccepted'),
+  PRIMARY KEY (timestamp,username,mac)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+INSERT INTO catt VALUES (0,'CATrustTest','??:??:??:??:??:??','unknown');
+CREATE USER 'raduser'@'localhost' IDENTIFIED BY 'boyeemie7Jai6ch';
+GRANT ALL PRIVILEGES ON radiator.* TO 'raduser'@'localhost';
+FLUSH PRIVILEGES;
