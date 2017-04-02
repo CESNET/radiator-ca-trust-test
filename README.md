@@ -4,8 +4,8 @@ Set of Radiator hooks and example configuration file to show how to test if EAP 
 
 If client is correctly configured than first EAP authentication fail because client refuses to send its credentials to rogue RADIUS. If client is incorrectly configured, RADIUS sends access-request.Surprisingly only Windows 7, 8 and 8.1 are not able to handle this technique and require user to re-enter his credentials. Following compatible systems, immediately retry authentication without requesting any action from user. Successfully tested systems are:
  * Android 4.4.4, 5.0.2, 6.0.1
- * Linux with wpa_supplicant: 1.0.3, 2.4.
  * iOS 10.2.1
+ * Linux with wpa_supplicant: 1.0.3, 2.4.
  * Mac OS X 10.12.3 (Sierra)
  * Windows 10
 
