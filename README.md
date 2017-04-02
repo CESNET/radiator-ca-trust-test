@@ -75,6 +75,8 @@ that is because I was not able to figure any usable hook to catch inner tunnelle
 	...
 ```
 
+# Output
+
 The result of test is evaluated in function ``CATrustTest::evaluateResult()``, results are stored in table catt (CATrustTest), for example:
 ```
 +------------+---------------------------+-------------------+------------+
