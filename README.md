@@ -91,3 +91,37 @@ and also logged via syslog:
 Apr  2 10:25:31 semik-dev CATrustTest[25026]: TIMESTAMP=1491121531#PN=semik@semik-dev.cesnet.cz#CSI=8c-70-5a-20-d0-bc#RESULT=CArefused
 Apr  2 16:38:37 semik-dev CATrustTest[25026]: TIMESTAMP=1491143917#PN=semik@semik-dev.cesnet.cz#CSI=8c-99-e6-d8-6a-9d#RESULT=CAaccepted
 ```
+
+# DB Synchronization
+
+In case you have multiple RADIUS servers you are going to need some way of DB synchronisation. I do want to have our RADIUSes as independent as possible, that is reason why I'm not using remote database for storing result info. But synchronisation is need to prevent multiple test on single client. Instead remote DB, I developed simple synchronisation using syslog-ng. On both servers I've defined:
+```
+source net {
+  tcp(
+    port(1999)
+    tls( ca_dir("/etc/ssl/certs")
+    key-file("/etc/ssl/private/radius1.cesnet.cz.key")
+    cert-file("/etc/ssl/certs/radius1.cesnet.cz.crt"))
+  );
+};
+
+destination net_catt { 
+  file("/var/log/ca-trust-test-net" owner("root") group("adm") perm(0600));
+  program("/etc/radiator/CATrustTest_receiver.pl");
+};
+
+destination d_catt {
+  file("/var/log/ca-trust-test" owner("root") group("adm") perm(0640));
+
+  tcp("radius2.cesnet.cz"
+    port(1999) 
+    tls( ca_dir("/etc/ssl/certs") 
+    key_file("/etc/ssl/private/radius1.cesnet.cz.key")
+    cert_file("/etc/ssl/certs/radius1.cesnet.cz.crt"))
+  );
+};
+
+log { source(net); destination(net_catt); };
+log { source(src); filter(f_catt); destination(d_catt); };
+```
+Remote syslog entries are stored into file ``cat-trust-test-net`` and syslog-ng forwards all messages to program [CATrustTest_receiver.pl](https://github.com/CESNET/radiator-ca-trust-test/blob/master/CATrustTest_receiver.pl) on update receiver updates timestamp on record with username ``CATrustTest`` which is used by function ``CATrustTest::reInit()`` which updates in memory hash table of already tested clients. In case some entries are being removed from database it is needed to reload Radiator process, entries are being only added not removed from memory.
