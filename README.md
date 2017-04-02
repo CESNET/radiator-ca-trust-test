@@ -13,7 +13,7 @@ If client is correctly configured than first EAP authentication fail because cli
 
 Hooks were developed with  Radiator RADIUS server 4.17 (patch set 1.2009), you will also need MySQL server and possibly syslog-ng server for remote synchronisation.
 
-You are going to need database named and table catt (CATrustTest), see file [catt_sql_def](https://github.com/CESNET/radiator-ca-trust-test/catt_sql_def). And you need to declare it in radius.cfg:
+You are going to need database named and table catt (CATrustTest), see file [catt_sql_def](https://github.com/CESNET/radiator-ca-trust-test/blob/master/catt_sql_def). And you need to declare it in radius.cfg:
 ```
 DefineFormattedGlobalVar CATrustTestDB	  DBI:mysql:radiator:localhost:3306
 DefineFormattedGlobalVar CATrustTestUser	XXYYXX
