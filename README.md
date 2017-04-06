@@ -2,7 +2,7 @@
 
 This repository contains a set of Radiator hooks and an example configuration file to test EAP clients correct configuration, in this case whether clients are checking if the EAP server certificate is issued by a trusted Certificate Authority (CA). Clients are distinguished by MAC addresses. The first EAP authentication request is handled by a special EAP endpoint with a certificate issued by an untrusted self signed CA. All the following requests are handled by a trusted CA. All the attempts are recorded in a log file as well as in MySQL database.
 
-If a client is configured correctly then the first EAP authentication request fails because the client refuses to send credentials to an untrusted RADIUS server. On the other hand, if the client is configured incorrectly, the RADIUS server sends `access-request`. Surprisingly, only Windows 7, 8 and 8.1 are not able to handle this technique and ask the user to re-enter credentials. The following list of compatible systems immediately retry authentication without any user interaction.
+If a client is configured correctly then the first EAP authentication request fails because the client refuses to send credentials to an untrusted RADIUS server. On the other hand, if the client is configured incorrectly, the RADIUS server sends `access-reject`. Surprisingly, only Windows 7, 8 and 8.1 are not able to handle this technique and ask the user to re-enter credentials. The following list of compatible systems immediately retry authentication without any user interaction.
 
 Successfully tested systems:
 - Android 4.4.4, 5.0.2, 6.0.1
