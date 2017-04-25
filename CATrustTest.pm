@@ -162,7 +162,10 @@ sub evaluateResult {
 sub tagClient {
   my $p = ${$_[0]};
 
+  # only Access-Request are relevant
   return unless ($p->code eq 'Access-Request');
+  # only Access-Request with EAP Message
+  return unless $p->get_attr('EAP-Message');
 
   my $CSI = normalizeMAC($p->get_attr('Calling-Station-Id'));
   return unless($CSI);
