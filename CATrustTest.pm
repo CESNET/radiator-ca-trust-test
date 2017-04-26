@@ -89,6 +89,8 @@ sub reInit {
 sub cleanup {
   my $now = time;
 
+  return unless ($now % 6 == 0);
+
   foreach my $CSI (keys %known) {
     if ($now > ($known{$CSI}->{timestamp}+$maxTestTime)) {
       recordTestResult($now, $CSI, $known{$CSI}->{username}, 'unknown');
@@ -161,6 +163,7 @@ sub evaluateResult {
     # client didn't accepted our fake CA.
     # move first seen time off period to permit quick recovery
     recordTestResult($now, $CSI, $user, 'CArefused');
+    delete $known{$CSI};
     &main::log($main::LOG_DEBUG, "CATrustTest: client $CSI / $user refused fake CA");
   } elsif ($result == $main::ACCEPT || $result == $main::REJECT) {
     recordTestResult($now, $CSI, $user, 'CAaccepted');
