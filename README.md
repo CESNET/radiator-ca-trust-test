@@ -58,6 +58,7 @@ This handler has to be **before** a real working `Handler`. You have to use regu
 
 <Handler Realm=/^semik-dev\.cesnet\.cz$/>
 	AuthBy	CheckLDAP
+	PostAuthHook sub { CATrustTest::recordAuthResult(@_) };
 </Handler>
 ```
 
@@ -79,16 +80,28 @@ this is because I've been unable to figure any usable hook to catch inner tunnel
 	...
 ```
 
+The function `CATrustTest::cleanup();` is used for cleaning time-outed
+devices, we have experienced problems with some Mac OS devices which
+simply didn't accepted CA, dropped ongoing authentication waited some
+time and again tried to connect. With `CATrustTest::cleanup();` they
+are next time threaded as tested device and connect normally.
+
+The function `CATrustTest::recordAuthResult(@_)` have to be called in
+`PostAuthHook` to add info about success full authentication
+(success_aa field in the catt table). Without this you can wrongfully
+assume that device is incorrectly configured.
+
 # Output
 
 The test results are evaluated by the `CATrustTest::evaluateResult()` function and then stored in the `catt` table (CATrustTest), for example:
 ```
-+------------+---------------------------+-------------------+------------+
-| timestamp  | username                  | mac               | result     |
-+------------+---------------------------+-------------------+------------+
-| 1491121531 | semik@semik-dev.cesnet.cz | 8c-70-5a-20-d0-bc | CArefused  |
-| 1491143917 | semik@semik-dev.cesnet.cz | 8c-99-e6-d8-6a-9d | CAaccepted |
-+------------+---------------------------+-------------------+------------+
++------------+---------------------------+-------------------+------------+------------+
+| timestamp  | username                  | mac               | result     | success_aa |
++------------+---------------------------+-------------------+------------+------------+
+| 1491121531 | semik@semik-dev.cesnet.cz | 8c-70-5a-12-34-56 | CArefused  |          0 |
+| 1491121531 | semik@semik-dev.cesnet.cz | 8c-70-5a-23-45-67 | unknown    |          0 |
+| 1491143917 | semik@semik-dev.cesnet.cz | 8c-99-e6-34-56-78 | CAaccepted | 1491143921 |
++------------+---------------------------+-------------------+------------+------------+
 ```
 
 Everything is also logged via syslog-ng:

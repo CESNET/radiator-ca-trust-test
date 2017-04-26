@@ -5,6 +5,7 @@ CREATE TABLE catt (
   username varchar(64),
   mac varchar(64),
   result set('unknown','CArefused','CAaccepted'),
+  success_aa int(11),
   PRIMARY KEY (timestamp,username,mac)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 INSERT INTO catt VALUES (0,'CATrustTest','??:??:??:??:??:??','unknown');

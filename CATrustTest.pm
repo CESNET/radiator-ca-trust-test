@@ -13,6 +13,7 @@ my $reInitTime = 5*60; # how often check if there are new data in SQL database
 my $lastInitTime = 0;
 my %known;
 my %leaked;
+my %persistent;
 
 my $dbh;
 
@@ -49,7 +50,7 @@ sub init {
     my $sth = $dbh->prepareAndExecute($query);
     my $counter = 0;
     while (my $res = $sth->fetchrow_hashref) {
-      $known{$res->{mac}} = $res->{timestamp};
+      $persistent{$res->{mac}} = $res->{timestamp};
       $counter++;
     };
     &main::log($main::LOG_DEBUG, "CATrustTest: loaded $counter CSI from SQL storage");
@@ -85,6 +86,20 @@ sub reInit {
   };
 };
 
+sub cleanup {
+  my $now = time;
+
+  foreach my $CSI (keys %known) {
+    if ($now > ($known{$CSI}->{timestamp}+$maxTestTime)) {
+      recordTestResult($now, $CSI, $known{$CSI}->{username}, 'unknown');
+      &main::log($main::LOG_DEBUG, "CATrustTest: client $CSI / ".$known{$CSI}->{username}." timeouted");
+      delete $known{$CSI};
+    };
+  };
+
+  return 1;
+};
+
 sub recordTestResult {
   my $now = shift;
   my $CSI = shift;
@@ -94,6 +109,8 @@ sub recordTestResult {
   unless ($dbh) {
     $dbh = Radius::AuthGeneric::find('CATrustTestDB');
   };
+
+  $persistent{$CSI} = $now;
 
   if ($dbh) {
     my $query = sprintf("INSERT INTO catt (timestamp, username, mac, result) VALUES (%s, %s, %s, %s)",
@@ -145,13 +162,14 @@ sub evaluateResult {
     # move first seen time off period to permit quick recovery
     recordTestResult($now, $CSI, $user, 'CArefused');
     &main::log($main::LOG_DEBUG, "CATrustTest: client $CSI / $user refused fake CA");
-    $known{$CSI} = $now-1-$maxTestTime;
   } elsif ($result == $main::ACCEPT || $result == $main::REJECT) {
     recordTestResult($now, $CSI, $user, 'CAaccepted');
     &main::log($main::LOG_DEBUG, "CATrustTest: client $CSI / $user leaked his password");
 
     # record info, that this client already leaked his password
-    $leaked{$CSI} = $now;
+    $leaked{$CSI}->{timestamp} = $now;
+    $leaked{$CSI}->{username} = $user;
+    delete $known{$CSI};
   };
 
   if ($result == $main::ACCEPT or $result == $main::REJECT) {
@@ -166,6 +184,8 @@ sub tagClient {
   return unless ($p->code eq 'Access-Request');
   # only Access-Request with EAP Message
   return unless $p->get_attr('EAP-Message');
+
+  #sleep(1);
 
   my $CSI = normalizeMAC($p->get_attr('Calling-Station-Id'));
   return unless($CSI);
@@ -182,17 +202,20 @@ sub tagClient {
   my $now = time;
 
   my $test = 1;
-  if (exists $known{$CSI}) {
-    # know client, test only if it is recent
-    $test = $now <= ($known{$CSI}+$maxTestTime);
-  } else {
-    # we meet first time
-    $known{$CSI} = $now;
-  };
 
-  if ($test and (exists $leaked{$CSI})) {
+  if (exists $persistent{$CSI}) {
+    $test = 0;
+    #&main::log($main::LOG_DEBUG, "CATrustTest: client $CSI / $user was already tested in past before restart");
+  } elsif (exists $leaked{$CSI}) {
     # client already leaked his password; do not mess his authentication anymore
     $test = 0;
+  } elsif (exists $known{$CSI}) {
+    # know client, test only if it is recent, it should be cleaned after some time in cleanup()
+    $test = $now <= ($known{$CSI}->{timestamp}+$maxTestTime)
+  } else {
+    # we meet first time
+    $known{$CSI}->{timestamp} = $now;
+    $known{$CSI}->{username} = $user;
   };
 
   if ($test) {
@@ -202,6 +225,47 @@ sub tagClient {
   };
 
   &main::log($main::LOG_DEBUG, "CATrustTest: not testing already tested client $CSI / $user");
+};
+
+sub recordAuthResult {
+  my $p = ${$_[0]};
+  my $rp = ${$_[1]};
+  my $result = ${$_[2]};
+
+  if ($result == $main::ACCEPT) {
+    my $CSI = normalizeMAC($p->get_attr('Calling-Station-Id'));
+    return unless($CSI);
+    my $user = $p->get_attr('User-Name');
+    return unless($user);
+
+    unless (exists $leaked{$CSI}) {
+      &main::log($main::LOG_DEBUG, "CATrustTest: $CSI / $user got Access-Accept ... not leaked user");
+      return;
+    };
+    if ($leaked{$CSI}->{success_aa}) {
+      &main::log($main::LOG_DEBUG, "CATrustTest: $CSI / $user got Access-Accept - db was already updated");
+      return;
+    };
+
+    unless ($dbh) {
+      $dbh = Radius::AuthGeneric::find('CATrustTestDB');
+    };
+
+    if ($dbh) {
+      my $now = time;
+
+      my $query = sprintf("UPDATE catt SET success_aa=%s WHERE timestamp=%s AND username=%s AND mac=%s",
+			  $now,
+			  $leaked{$CSI}->{timestamp} || 0,
+			  $dbh->quote($user),
+			  $dbh->quote($CSI));
+      $leaked{$CSI}->{success_aa} = $now;
+      &main::log($main::LOG_DEBUG, "CATrustTest: $CSI / $user got Access-Accept - updating db");
+      my $sth = $dbh->prepareAndExecute($query);
+
+      _syslog("TIMESTAMP=".$leaked{$CSI}->{timestamp}."#PN=$user#CSI=$CSI#AUTHRESULT=ACCEPT");
+    };
+  };
 };
 
 sub stopTunnelledRequests {
